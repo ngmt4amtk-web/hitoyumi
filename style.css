@@ -12,3 +12,18 @@
 
 .license-copy{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.7}.finish-icon .ui-icon{width:40px;height:40px}
 .current-score{max-width:520px;margin:8px auto 12px}.current-score .score-bar{max-height:none;background:transparent}.current-score .note-highlight{transition:fill .12s}.current-score .note-highlight.active{fill:#dcead7;stroke:#779b68;stroke-width:1.5}
+
+/* 章を開いた分だけメニューを表示する。 */
+details.unit{margin-top:12px;border:1px solid var(--line);border-radius:14px;background:var(--white);overflow:hidden}
+summary.unit-heading{list-style:none;margin:0;padding:17px 16px;cursor:pointer;min-height:62px;gap:10px}
+summary.unit-heading::-webkit-details-marker{display:none}
+summary.unit-heading h3{flex:1;line-height:1.7}
+summary.unit-heading:after{content:'＋';flex:0;background:none;height:auto;font-size:18px;color:var(--green);margin:0}
+details.unit[open] summary.unit-heading:after{content:'−'}
+.unit-count{font-size:10px;color:var(--muted);white-space:nowrap}
+details.unit .lesson-list{padding:0 12px 12px}
+summary:focus-visible{outline:3px solid #dbad50;outline-offset:-3px}
+.exercise-select{width:100%;max-width:100%}
+.lesson-meta .pill{white-space:normal;line-height:1.7}
+.finger-map span.half{width:27px;color:#706035}
+@media(max-width:360px){summary.unit-heading{padding:14px 12px;gap:7px}.unit-count{font-size:9px}.finger-map{padding:14px 8px}.finger-map span{width:33px}.finger-map b{width:29px;height:29px}}

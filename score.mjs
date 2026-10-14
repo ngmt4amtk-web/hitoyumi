@@ -1,5 +1,5 @@
 import {STRINGS} from './content.mjs';
-import {CLEF_PATH,SHARP_PATH,NOTEHEAD_PATH,WHOLE_PATH,HALF_PATH,FLAG_UP_PATH,FLAG_DOWN_PATH,REST_WHOLE_PATH,REST_HALF_PATH,REST_QUARTER_PATH,REST_EIGHTH_PATH} from './glyphs.mjs';
+import {CLEF_PATH,SHARP_PATH,FLAT_PATH,NATURAL_PATH,NOTEHEAD_PATH,WHOLE_PATH,HALF_PATH,FLAG_UP_PATH,FLAG_DOWN_PATH,REST_WHOLE_PATH,REST_HALF_PATH,REST_QUARTER_PATH,REST_EIGHTH_PATH} from './glyphs.mjs';
 
 export function escapeHTML(value){return String(value).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));}
 const STAFF_SPACE=11;
@@ -22,7 +22,8 @@ export function noteGlyph(note,x,bottom,settings={}){
  for(const step of ledgers){const y=pitchY(bottom,step),halfWidth=Math.max(.96,headWidth/2+.35)*STAFF_SPACE;out+=`<path data-role="ledger-line" data-step="${step}" d="M${svgNumber(x-halfWidth)} ${y}H${svgNumber(x+halfWidth)}" fill="none" stroke="#5a6660" stroke-width="${STAFF_SPACE/8}" stroke-linecap="round"/>`;}
  for(const n of tones){
   const y=pitchY(bottom,n.step),color=colorFor(n);
-  if(n.name.includes('♯'))out+=glyph(SHARP_PATH,x-1.72*STAFF_SPACE,y,color,'accidental');
+  const accidental=n.accidental||(n.name.includes('♯')?'sharp':n.name.includes('♭')?'flat':null);
+  if(accidental)out+=`<g data-accidental="${accidental}">${glyph({sharp:SHARP_PATH,flat:FLAT_PATH,natural:NATURAL_PATH}[accidental],x-1.72*STAFF_SPACE,y,color,'accidental')}</g>`;
   out+=glyph(head,left,y,color,'notehead');
  }
  if(note.beats<4){
@@ -47,13 +48,17 @@ export function renderSingle(note,settings={}){
 export function renderScore(notes,settings={},group=0){
  const visible=group===null?notes:notes.filter(n=>n.bar>=group*4&&n.bar<group*4+4),bars=[...new Set(visible.map(n=>n.bar))];
  return bars.map(bar=>{
-  const ns=visible.filter(n=>n.bar===bar),width=Math.max(350,ns.length*49+76),left=56,space=(width-left-24)/Math.max(4,ns.reduce((s,n)=>s+n.beats,0));
-  const noteX=n=>left+(n.start%4)*space+13;
+  const ns=visible.filter(n=>n.bar===bar),meter=ns[0].meter||4,width=Math.max(350,ns.length*49+96),left=76,space=(width-left-24)/Math.max(meter,ns.reduce((s,n)=>s+n.beats,0));
+  const noteX=n=>left+(n.start%meter)*space+13;
   // 選択の背景を先に描き、五線・加線・音符をその上に保つ。
   let body=ns.map(n=>`<rect data-score-index="${n.index}" class="note-highlight" x="${noteX(n)-21}" y="19" width="43" height="120" rx="12" fill="transparent"/>`).join('');
   body+=staffLines(width)+clef(14,96)+`<text x="12" y="159" font-size="12" fill="#8b9189">${bar+1}</text>`;
+  if(bar===0)body+=`<g data-role="time-signature" fill="#263d38" text-anchor="middle" font-family="serif" font-weight="700" font-size="24"><text x="52" y="73">${meter}</text><text x="52" y="95">4</text></g>`;
+  const accidentals=new Map();
   for(const n of ns){const x=noteX(n);
-   body+=`<g data-score-index="${n.index}">${noteGlyph(n,x,96,settings)}${settings.names!==false?`<text x="${x}" y="159" font-size="12" fill="#69756e" text-anchor="middle">${escapeHTML(n.rest?'休':n.chord?.map(z=>z.string).join('+')||n.string)}</text>`:''}</g>`;
+   const decorate=tone=>{const alteration=tone.alteration??(tone.name.includes('♯')?1:0),previous=accidentals.get(tone.step)||0;accidentals.set(tone.step,alteration);return {...tone,accidental:alteration===1?'sharp':alteration===-1?'flat':previous!==0?'natural':null};};
+   const printed=n.rest?n:n.chord?{...n,chord:n.chord.map(decorate)}:decorate(n);
+   body+=`<g data-score-index="${n.index}">${noteGlyph(printed,x,96,settings)}${settings.names!==false?`<text x="${x}" y="159" font-size="12" fill="#69756e" text-anchor="middle">${escapeHTML(n.rest?'休':n.chord?.map(z=>z.string).join('+')||n.string)}</text>`:''}</g>`;
    if(n.slurStart){const next=ns.find(z=>z.index===n.index+1);if(next){const nx=noteX(next),y=Math.max(110,pitchY(96,n.step)+12,pitchY(96,next.step)+12);body+=`<path data-role="slur" d="M${x} ${y}Q${(x+nx)/2} ${y+16} ${nx} ${y}" fill="none" stroke="#69756e" stroke-width="1.4"/>`;}}
   }
   body+=`<path d="M${width-12} 52V96" stroke="#66746d" stroke-width="1.2"/>`;
