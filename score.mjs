@@ -45,7 +45,7 @@ export function renderSingle(note,settings={}){
  return `<svg class="single-score" viewBox="0 0 310 170" role="img" aria-label="${escapeHTML(note.rest?'休符':note.chord?.map(n=>n.name).join('と')||note.name)}、${note.beats}拍">${staffLines(310,114)}${clef(23,114)}${noteGlyph(note,177,114,settings)}${settings.names!==false?`<text x="177" y="160" text-anchor="middle" font-size="13" fill="#65746d">${escapeHTML(note.rest?'休み':note.chord?.map(n=>n.name).join(' ＋ ')||note.name)}</text>`:''}</svg>`;
 }
 export function renderScore(notes,settings={},group=0){
- const visible=notes.filter(n=>n.bar>=group*4&&n.bar<group*4+4),bars=[...new Set(visible.map(n=>n.bar))];
+ const visible=group===null?notes:notes.filter(n=>n.bar>=group*4&&n.bar<group*4+4),bars=[...new Set(visible.map(n=>n.bar))];
  return bars.map(bar=>{
   const ns=visible.filter(n=>n.bar===bar),width=Math.max(350,ns.length*49+76),left=56,space=(width-left-24)/Math.max(4,ns.reduce((s,n)=>s+n.beats,0));
   const noteX=n=>left+(n.start%4)*space+13;
