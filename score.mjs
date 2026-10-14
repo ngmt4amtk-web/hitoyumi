@@ -1,0 +1,60 @@
+import {STRINGS} from './content.mjs';
+import {CLEF_PATH,SHARP_PATH,NOTEHEAD_PATH,WHOLE_PATH,HALF_PATH,FLAG_UP_PATH,FLAG_DOWN_PATH,REST_WHOLE_PATH,REST_HALF_PATH,REST_QUARTER_PATH,REST_EIGHTH_PATH} from './glyphs.mjs';
+
+export function escapeHTML(value){return String(value).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));}
+const STAFF_SPACE=11;
+const svgNumber=value=>String(Math.round(value*1000)/1000);
+const pitchY=(bottom,step)=>bottom-step*STAFF_SPACE/2;
+function glyph(path,x,y,color,role){return `<path data-role="${role}" d="${path}" transform="translate(${svgNumber(x)} ${svgNumber(y)}) scale(${STAFF_SPACE})" fill="${color}"/>`;}
+// ふよみと同じ基準。ト音記号のGの中心を、下から2本目のG4の線に置く。
+function clef(x,bottom){return glyph(CLEF_PATH,x,pitchY(bottom,2),'#263d38','clef');}
+export function noteGlyph(note,x,bottom,settings={}){
+ if(note.rest){
+  const rests={4:[REST_WHOLE_PATH,1.128,6],2:[REST_HALF_PATH,1.128,4],1:[REST_QUARTER_PATH,1.08,4],.5:[REST_EIGHTH_PATH,.988,4]};
+  const [path,width,step]=rests[note.beats]||rests[1];
+  return glyph(path,x-width*STAFF_SPACE/2,pitchY(bottom,step),'#263d38','rest');
+ }
+ const tones=note.chord||[note],head=note.beats===4?WHOLE_PATH:note.beats===2?HALF_PATH:NOTEHEAD_PATH;
+ const headWidth=note.beats===4?1.688:1.18,left=x-headWidth*STAFF_SPACE/2;
+ const colorFor=n=>settings.colors===false?'#263d38':STRINGS[n.string].color;
+ let out='';const ledgers=new Set();
+ for(const n of tones){for(let step=-2;step>=n.step;step-=2)ledgers.add(step);for(let step=10;step<=n.step;step+=2)ledgers.add(step);}
+ for(const step of ledgers){const y=pitchY(bottom,step),halfWidth=Math.max(.96,headWidth/2+.35)*STAFF_SPACE;out+=`<path data-role="ledger-line" data-step="${step}" d="M${svgNumber(x-halfWidth)} ${y}H${svgNumber(x+halfWidth)}" fill="none" stroke="#5a6660" stroke-width="${STAFF_SPACE/8}" stroke-linecap="round"/>`;}
+ for(const n of tones){
+  const y=pitchY(bottom,n.step),color=colorFor(n);
+  if(n.name.includes('♯'))out+=glyph(SHARP_PATH,x-1.72*STAFF_SPACE,y,color,'accidental');
+  out+=glyph(head,left,y,color,'notehead');
+ }
+ if(note.beats<4){
+  const up=(Math.min(...tones.map(n=>n.step))+Math.max(...tones.map(n=>n.step)))/2<4;
+  const ys=tones.map(n=>pitchY(bottom,n.step)),anchor=up?Math.max(...ys):Math.min(...ys);
+  const stemX=left+(up?1.18:0)*STAFF_SPACE,start=anchor+(up?-.168:.168)*STAFF_SPACE;
+  const end=(up?Math.min(...ys):Math.max(...ys))+(up?-3.5:3.5)*STAFF_SPACE,color=colorFor(tones[0]);
+  out+=`<path data-role="stem" d="M${svgNumber(stemX)} ${svgNumber(start)}V${svgNumber(end)}" fill="none" stroke="${color}" stroke-width="${.13*STAFF_SPACE}"/>`;
+  if(note.beats===.5)out+=glyph(up?FLAG_UP_PATH:FLAG_DOWN_PATH,stemX-.065*STAFF_SPACE,end+(up?-.04:.132)*STAFF_SPACE,color,'flag');
+ }
+ if(settings.fingers!==false){
+  const top=Math.min(bottom-4*STAFF_SPACE,...tones.map(n=>pitchY(bottom,n.step)-STAFF_SPACE*.5));
+  const y=top-.52*STAFF_SPACE;
+  out+=`<text data-role="finger" x="${x}" y="${svgNumber(y)}" text-anchor="middle" font-size="${.95*STAFF_SPACE}" font-weight="700">${tones.map((n,i)=>`<tspan fill="${colorFor(n)}">${i?' · ':''}${n.finger}</tspan>`).join('')}</text>`;
+ }
+ return out;
+}
+export function staffLines(width,bottom=96){return Array.from({length:5},(_,i)=>`<path data-role="staff-line" d="M12 ${bottom-i*STAFF_SPACE}H${width-12}" stroke="#a1aaa3" stroke-width="${STAFF_SPACE/8}"/>`).join('');}
+export function renderSingle(note,settings={}){
+ return `<svg class="single-score" viewBox="0 0 310 170" role="img" aria-label="${escapeHTML(note.rest?'休符':note.chord?.map(n=>n.name).join('と')||note.name)}、${note.beats}拍">${staffLines(310,114)}${clef(23,114)}${noteGlyph(note,177,114,settings)}${settings.names!==false?`<text x="177" y="160" text-anchor="middle" font-size="13" fill="#65746d">${escapeHTML(note.rest?'休み':note.chord?.map(n=>n.name).join(' ＋ ')||note.name)}</text>`:''}</svg>`;
+}
+export function renderScore(notes,settings={},group=0){
+ const visible=notes.filter(n=>n.bar>=group*4&&n.bar<group*4+4),bars=[...new Set(visible.map(n=>n.bar))];
+ return bars.map(bar=>{
+  const ns=visible.filter(n=>n.bar===bar),width=Math.max(350,ns.length*49+76),left=56,space=(width-left-24)/Math.max(4,ns.reduce((s,n)=>s+n.beats,0));
+  const noteX=n=>left+(n.start%4)*space+13;
+  let body=staffLines(width)+clef(14,96)+`<text x="12" y="159" font-size="12" fill="#8b9189">${bar+1}</text>`;
+  for(const n of ns){const x=noteX(n);
+   body+=`<g data-score-index="${n.index}"><rect class="note-highlight" x="${x-21}" y="19" width="43" height="120" rx="12" fill="transparent"/>${noteGlyph(n,x,96,settings)}${settings.names!==false?`<text x="${x}" y="159" font-size="12" fill="#69756e" text-anchor="middle">${escapeHTML(n.rest?'休':n.chord?.map(z=>z.string).join('+')||n.string)}</text>`:''}</g>`;
+   if(n.slurStart){const next=ns.find(z=>z.index===n.index+1);if(next){const nx=noteX(next),y=Math.max(110,pitchY(96,n.step)+12,pitchY(96,next.step)+12);body+=`<path data-role="slur" d="M${x} ${y}Q${(x+nx)/2} ${y+16} ${nx} ${y}" fill="none" stroke="#69756e" stroke-width="1.4"/>`;}}
+  }
+  body+=`<path d="M${width-12} 52V96" stroke="#66746d" stroke-width="1.2"/>`;
+  return `<svg class="score-bar" viewBox="0 0 ${width} 174" role="img" aria-label="${bar+1}小節目">${body}</svg>`;
+ }).join('');
+}
