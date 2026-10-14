@@ -49,9 +49,11 @@ export function renderScore(notes,settings={},group=0){
  return bars.map(bar=>{
   const ns=visible.filter(n=>n.bar===bar),width=Math.max(350,ns.length*49+76),left=56,space=(width-left-24)/Math.max(4,ns.reduce((s,n)=>s+n.beats,0));
   const noteX=n=>left+(n.start%4)*space+13;
-  let body=staffLines(width)+clef(14,96)+`<text x="12" y="159" font-size="12" fill="#8b9189">${bar+1}</text>`;
+  // 選択の背景を先に描き、五線・加線・音符をその上に保つ。
+  let body=ns.map(n=>`<rect data-score-index="${n.index}" class="note-highlight" x="${noteX(n)-21}" y="19" width="43" height="120" rx="12" fill="transparent"/>`).join('');
+  body+=staffLines(width)+clef(14,96)+`<text x="12" y="159" font-size="12" fill="#8b9189">${bar+1}</text>`;
   for(const n of ns){const x=noteX(n);
-   body+=`<g data-score-index="${n.index}"><rect class="note-highlight" x="${x-21}" y="19" width="43" height="120" rx="12" fill="transparent"/>${noteGlyph(n,x,96,settings)}${settings.names!==false?`<text x="${x}" y="159" font-size="12" fill="#69756e" text-anchor="middle">${escapeHTML(n.rest?'休':n.chord?.map(z=>z.string).join('+')||n.string)}</text>`:''}</g>`;
+   body+=`<g data-score-index="${n.index}">${noteGlyph(n,x,96,settings)}${settings.names!==false?`<text x="${x}" y="159" font-size="12" fill="#69756e" text-anchor="middle">${escapeHTML(n.rest?'休':n.chord?.map(z=>z.string).join('+')||n.string)}</text>`:''}</g>`;
    if(n.slurStart){const next=ns.find(z=>z.index===n.index+1);if(next){const nx=noteX(next),y=Math.max(110,pitchY(96,n.step)+12,pitchY(96,next.step)+12);body+=`<path data-role="slur" d="M${x} ${y}Q${(x+nx)/2} ${y+16} ${nx} ${y}" fill="none" stroke="#69756e" stroke-width="1.4"/>`;}}
   }
   body+=`<path d="M${width-12} 52V96" stroke="#66746d" stroke-width="1.2"/>`;
